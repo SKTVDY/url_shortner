@@ -1,0 +1,26 @@
+import { useEffect, useState } from 'react';
+import { ArrowLeft, ArrowUpRight, BarChart3, CalendarDays, Check, Clock3, Copy, ExternalLink, Link2, MousePointer2, TrendingUp } from 'lucide-react';
+import { Link, useParams } from 'react-router-dom';
+import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import api from '../services/api';
+import { copyText, formatDate, shortenText } from '../utils/format';
+import { useToast } from '../components/ToastContext';
+
+export default function LinkAnalyticsPage() {
+  const { id } = useParams();
+  const toast = useToast();
+  const [analytics, setAnalytics] = useState(null);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    let active = true;
+    api.get(`/urls/${id}/analytics`).then(({ data }) => { if (active) setAnalytics(data.data.analytics); }).catch((error) => { if (active) toast(error.response?.data?.message || 'Could not load analytics.', 'error'); }).finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [id, toast]);
+  const url = analytics?.url;
+  return <><Link className="back-link" to="/dashboard"><ArrowLeft size={15}/> Back to links</Link>{loading ? <div className="analytics-loading"><span className="spinner"/> Gathering your link stats…</div> : !analytics ? <div className="detail-error"><strong>We couldn’t find that link.</strong><Link to="/dashboard">Return to your links</Link></div> : <>
+    <div className="welcome-row analytics-title-row"><div><div className="eyebrow">A CLOSER LOOK</div><h1>{url.shortCode} <span className="title-inline-icon"><ArrowUpRight size={18}/></span></h1><p className="analytics-destination"><ExternalLink size={14}/><a href={url.originalUrl} target="_blank" rel="noreferrer">{shortenText(url.originalUrl, 76)}</a></p></div><button className="secondary-button" onClick={async () => { try { await copyText(url.shortUrl); toast('Short link copied.'); } catch { toast('Clipboard access unavailable.', 'error'); } }}><Copy size={15}/> Copy short link</button></div>
+    <section className="detail-stats"><article><span className="metric-icon metric-lavender"><MousePointer2 size={17}/></span><span className="detail-stat-label">ALL-TIME CLICKS</span><strong>{analytics.totalClicks.toLocaleString()}</strong><small><TrendingUp size={13}/> From every share</small></article><article><span className="metric-icon metric-sage"><CalendarDays size={17}/></span><span className="detail-stat-label">CREATED ON</span><strong className="detail-date">{formatDate(url.createdAt)}</strong><small><Check size={13}/> Ready to share</small></article><article><span className="metric-icon metric-peach"><Clock3 size={17}/></span><span className="detail-stat-label">EXPIRATION</span><strong className="detail-date">{url.expiresAt ? formatDate(url.expiresAt) : 'Never expires'}</strong><small>{url.isActive ? 'Currently active' : 'Currently disabled'}</small></article></section>
+    <section className="chart-card"><div className="chart-header"><div><div className="eyebrow">LAST 14 DAYS</div><h2>Click activity</h2></div><div className="chart-legend"><i/> Clicks per day</div></div><div className="chart-area"><ResponsiveContainer width="100%" height="100%"><AreaChart data={analytics.trend} margin={{ top: 10, right: 10, left: -22, bottom: 0 }}><defs><linearGradient id="clickGradient" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#6d8966" stopOpacity={0.2}/><stop offset="95%" stopColor="#6d8966" stopOpacity={0.01}/></linearGradient></defs><CartesianGrid stroke="#ecebe6" strokeDasharray="3 5" vertical={false}/><XAxis dataKey="date" tickFormatter={(date) => new Date(`${date}T00:00:00`).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} tick={{ fontSize: 11, fill: '#9a9993' }} axisLine={false} tickLine={false} minTickGap={25}/><YAxis allowDecimals={false} tick={{ fontSize: 11, fill: '#9a9993' }} axisLine={false} tickLine={false} tickCount={4}/><Tooltip labelFormatter={(date) => formatDate(`${date}T00:00:00`, { month: 'long', day: 'numeric', year: 'numeric' })} contentStyle={{ borderRadius: 10, border: '1px solid #ecebe6', boxShadow: '0 8px 24px rgba(0,0,0,.06)', fontSize: 12 }} cursor={{ stroke: '#c5c8bd', strokeDasharray: '4 4' }}/><Area type="monotone" dataKey="clicks" stroke="#71896b" strokeWidth={2.3} fill="url(#clickGradient)" activeDot={{ r: 4, fill: '#71896b', stroke: '#fff', strokeWidth: 2 }}/></AreaChart></ResponsiveContainer></div>{analytics.totalClicks === 0 && <div className="chart-empty"><BarChart3 size={17}/> Your first click will start the chart.</div>}</section>
+    <div className="detail-bottom"><section className="info-card"><div className="eyebrow">YOUR SHORT LINK</div><div className="short-url-preview"><span className="link-mini-icon"><Link2 size={15}/></span><a href={url.shortUrl} target="_blank" rel="noreferrer">{url.shortUrl.replace(/^https?:\/\//, '')}</a><ArrowUpRight size={14}/></div><p>Share this link anywhere. We’ll count each visit for you.</p></section><section className="info-card"><div className="eyebrow">DESTINATION URL</div><a className="destination-preview" href={url.originalUrl} target="_blank" rel="noreferrer">{url.originalUrl}<ArrowUpRight size={14}/></a><p>Your visitors land right here.</p></section></div>
+  </>}</>;
+}
